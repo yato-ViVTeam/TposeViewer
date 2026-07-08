@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TposeViewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #0f172a;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        #c1 {
+            width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 10;
+        }
+        .page-transition {
+            position: absolute; width: 100%; height: 100%; top: 0; left: 0;
+            transition: opacity 0.3s, transform 0.3s, visibility 0.3s;
+        }
+        .hidden-page {
+            opacity: 0; pointer-events: none; visibility: hidden; transform: scale(0.98); z-index: 0;
+        }
+        .active-page {
+            opacity: 1; pointer-events: auto; visibility: visible; transform: scale(1); z-index: 20;
+        }
+        .drag-active {
+            border-color: #6366f1 !important;
+            background-color: rgba(99, 102, 241, 0.1) !important;
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+                "@pixiv/three-vrm": "https://unpkg.com/@pixiv/three-vrm@3.0.0/lib/three-vrm.module.js"
+            }
+        }
+    </script>
+</head>
+<body oncontextmenu="return false;">
+    <div id="p1" class="page-transition active-page flex items-center justify-center bg-slate-950 text-white p-4 overflow-y-auto">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-8">
+            <div class="text-center mb-6">
+                <div class="inline-flex p-3 bg-indigo-600/10 text-indigo-400 rounded-full mb-3">
+                    <i data-lucide="shield-check" class="w-8 h-8"></i>
+                </div>
+                <h2 class="text-xl font-bold tracking-tight">セキュアモデルビューアー</h2>
+                <p class="text-xs text-slate-400 mt-2">提供された暗号化モデル(.ViVionDat)を選択してください</p>
+            </div>
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">復号パスワード</label>
+                    <input type="password" id="i1" required 
+                        class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition-colors" 
+                        placeholder="パスワードを入力">
+                    <p class="mt-2 text-xs text-rose-400 font-semibold flex items-start gap-1">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
+                        <span>※パスワードはあなた専用です。第三者への共有は固く禁じます。</span>
+                    </p>
+                </div>
+                <div class="bg-slate-950/50 border border-slate-800 p-3 rounded-lg flex items-start gap-3">
+                    <div class="flex items-center h-5 mt-0.5">
+                        <input id="i2" type="checkbox" class="w-4 h-4 text-indigo-600 bg-slate-900 border-slate-700 rounded focus:ring-indigo-500 cursor-pointer">
+                    </div>
+                    <div class="text-xs text-slate-300">
+                        <label for="i2" class="font-bold text-white block mb-1 cursor-pointer">本ツールの利用・機密保持に同意する</label>
+                        表示されたモデルのスクリーンショットの公開、データ解析、第三者への開示を禁じます。
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">モデルファイル (.ViVionDat)</label>
+                    <div id="d1" class="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center transition-colors hover:border-indigo-500 cursor-pointer bg-slate-950/50">
+                        <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-500 mx-auto mb-2"></i>
+                        <p class="text-sm font-medium text-slate-300">ここをタップしてファイルを選択<br><span class="text-xs text-slate-500 font-normal">またはドラッグ＆ドロップ</span></p>
+                        <input type="file" id="i3" accept=".ViVionDat,.vrm" class="hidden">
+                    </div>
+                </div>
+                <div id="e1" class="hidden text-xs text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded px-3 py-2 text-center font-bold">
+                    エラーが発生しました。
+                </div>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-800/60 text-center">
+                <p class="text-[10px] text-slate-500">※ファイルの復号はすべてお使いの端末(ブラウザ上)で行われます。<br>サーバーへのデータ送信は一切行われません。</p>
+            </div>
+        </div>
+    </div>
+    <div id="p2" class="page-transition hidden-page" style="background-color: #111827;">
+        <div id="d2" class="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] z-0 pointer-events-none flex flex-wrap justify-center items-center opacity-[0.07] rotate-[-30deg] select-none text-white text-4xl md:text-5xl font-bold tracking-widest overflow-hidden">
+        </div>
+        <div id="c1" class="absolute inset-0 z-10"></div>
+        <div class="absolute inset-0 z-30 pointer-events-none flex flex-col justify-between p-4 md:p-6">
+            <div class="flex justify-between items-start">
+                <div class="bg-slate-900/90 backdrop-blur border border-slate-800 p-3 md:p-4 rounded-xl text-white pointer-events-auto shadow-lg">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <h4 id="t1" class="font-bold text-sm md:text-base">Model</h4>
+                    </div>
+                </div>
+                <button onclick="x6()" class="bg-slate-900/90 hover:bg-slate-800 backdrop-blur border border-slate-800 text-slate-300 hover:text-white px-3 py-2 md:px-4 md:py-2.5 rounded-xl flex items-center gap-2 text-xs md:text-sm pointer-events-auto transition-all shadow-lg">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                    <span>閉じる</span>
+                </button>
+            </div>
+            <div class="flex flex-row gap-2 md:gap-3 justify-between items-end">
+                <div id="h1" class="bg-slate-900/90 backdrop-blur border border-slate-800 p-2.5 md:p-4 rounded-xl text-[10px] md:text-xs text-slate-300 space-y-1.5 pointer-events-auto shadow-lg max-w-[200px] md:max-w-sm">
+                </div>
+                <button onclick="y9()" class="bg-slate-900/90 hover:bg-slate-800 backdrop-blur border border-slate-800 text-white p-2.5 md:p-3 rounded-xl pointer-events-auto transition-all flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs shadow-lg h-fit">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 md:w-4 md:h-4"></i>
+                    <span>カメラリセット</span>
+                </button>
+            </div>
+        </div>
+        <div id="l1" class="absolute inset-0 bg-slate-950/90 backdrop-blur z-50 flex flex-col items-center justify-center text-white transition-opacity duration-300 opacity-0 pointer-events-none">
+            <div class="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-6"></div>
+            <h3 class="text-lg md:text-xl font-bold tracking-tight mb-2">モデルを構築中...</h3>
+            <p class="text-xs text-slate-400">ブラウザ上で安全に処理しています</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { VRMLoaderPlugin } from '@pixiv/three-vrm';
+
+        lucide.createIcons();
+
+        const x1 = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        function x2() {
+            const x3 = document.getElementById('h1');
+            if (!x3) return;
+            if (x1) {
+                x3.innerHTML = `<span class="font-semibold text-white block mb-1.5">💡 操作マニュアル</span><div class="flex justify-between items-center"><kbd class="bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-800">1本指ドラッグ</kbd><span>：回転</span></div><div class="flex justify-between items-center"><kbd class="bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-800">2本指ドラッグ</kbd><span>：移動</span></div><div class="flex justify-between items-center"><kbd class="bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-800">ピンチ</kbd><span>：ズーム</span></div>`;
+            } else {
+                x3.innerHTML = `<span class="font-semibold text-white block mb-1.5">💡 操作マニュアル</span><div class="flex justify-between items-center"><kbd class="bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-800">左ドラッグ</kbd><span>：回転</span></div><div class="flex justify-between items-center mt-1.5"><kbd class="bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-800">右ドラッグ</kbd><span>：移動</span></div><div class="flex justify-between items-center mt-1.5"><kbd class="bg-slate-950 px-1.5 py-0.5 rounded text-slate-400 border border-slate-800">スクロール</kbd><span>：ズーム</span></div>`;
+            }
+        }
+        x2();
+
+        document.addEventListener('dragstart', (e) => e.preventDefault());
+
+        window.x4 = function(x5) {
+            document.querySelectorAll('.page-transition').forEach(p => {
+                p.classList.remove('active-page');
+                p.classList.add('hidden-page');
+            });
+            document.getElementById(x5).classList.remove('hidden-page');
+            document.getElementById(x5).classList.add('active-page');
+            if (x5 !== 'p2') w3();
+        };
+
+        window.x6 = function() {
+            window.x4('p1');
+            y8();
+            document.getElementById('i3').value = '';
+        };
+
+        function x7(x8, x9) {
+            if (!x9) return x8;
+            const xa = new Uint8Array(x8);
+            const xb = new TextEncoder().encode(x9);
+            for (let i = 0; i < xa.length; i++) {
+                xa[i] ^= xb[i % xb.length];
+            }
+            return xa.buffer;
+        }
+
+        const xc = document.getElementById('d1');
+        const xd = document.getElementById('i3');
+
+        xc.addEventListener('click', () => xd.click());
+        xc.addEventListener('dragover', (e) => { e.preventDefault(); xc.classList.add('drag-active'); });
+        xc.addEventListener('dragleave', () => { xc.classList.remove('drag-active'); });
+        xc.addEventListener('drop', (e) => {
+            e.preventDefault();
+            xc.classList.remove('drag-active');
+            if (e.dataTransfer.files.length) xe(e.dataTransfer.files[0]);
+        });
+
+        xd.addEventListener('change', (e) => {
+            if (e.target.files.length) xe(e.target.files[0]);
+        });
+
+        function xe(xf) {
+            const x9 = document.getElementById('i1').value;
+            const xg = document.getElementById('i2').checked;
+            if (!x9) { 
+                alert('先に復号パスワードを入力してください。'); 
+                xd.value = ''; return; 
+            }
+            if (!xg) {
+                alert('本ツールの利用・機密保持に同意（チェック）してください。');
+                xd.value = ''; return;
+            }
+            
+            const xh = document.getElementById('d2');
+            xh.innerHTML = '';
+            for (let i = 0; i < 200; i++) {
+                const xi = document.createElement('span');
+                xi.className = 'p-6 whitespace-nowrap';
+                xi.textContent = x9;
+                xh.appendChild(xi);
+            }
+
+            document.getElementById('e1').classList.add('hidden');
+            const xj = new FileReader();
+            
+            xj.onload = function(e) {
+                let xk = e.target.result;
+                const xl = document.getElementById('e1');
+                
+                if (xf.name.toLowerCase().endsWith('.viviondat')) {
+                    xk = x7(xk, x9);
+                    const xm = new Uint8Array(xk, 0, 4);
+                    const xn = new TextDecoder().decode(xm);
+                    if (!/^\d{4}$/.test(xn)) {
+                        xl.innerText = 'パスワードが間違っているか、ファイルが破損しています。';
+                        xl.classList.remove('hidden');
+                        xd.value = ''; return;
+                    }
+                    const xo = 2000 + parseInt(xn.substring(0, 2), 10);
+                    const xp = parseInt(xn.substring(2, 4), 10);
+                    const xq = new Date();
+                    const xr = xq.getFullYear();
+                    const xs = xq.getMonth() + 1;
+                    const xt = (xr - xo) * 12 + (xs - xp);
+                    if (xt >= 4) { 
+                        xl.innerText = 'ファイルの有効期限が切れているため読み込めませんでした。管理者に新しいデータを要求してください。';
+                        xl.classList.remove('hidden');
+                        xd.value = ''; return;
+                    }
+                    xk = xk.slice(4);
+                }
+                const xu = new Blob([xk], { type: 'application/octet-stream' });
+                const xv = URL.createObjectURL(xu);
+                z1(xv, xf.name);
+            };
+            xj.readAsArrayBuffer(xf);
+        }
+
+        let xw, xx, xy, xz, y1, y2, y3;
+        let g1 = null;
+        let y4 = new THREE.Vector3(0, 1.4, 0);
+
+        function y5() {
+            const y6 = document.getElementById('c1');
+            y6.innerHTML = '';
+            xw = new THREE.Scene();
+            xy = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            xy.setSize(y6.clientWidth, y6.clientHeight);
+            xy.setPixelRatio(window.devicePixelRatio);
+            xy.outputColorSpace = THREE.SRGBColorSpace;
+            xy.toneMapping = THREE.NoToneMapping; 
+            y6.appendChild(xy.domElement);
+            xx = new THREE.PerspectiveCamera(35, y6.clientWidth / y6.clientHeight, 0.1, 20.0);
+            xz = new OrbitControls(xx, xy.domElement);
+            xz.enableDamping = true;
+            xz.dampingFactor = 0.05;
+            xz.enableZoom = true;
+            xz.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+            xz.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+            const y7 = new THREE.DirectionalLight(0xffffff, Math.PI);
+            y7.position.set(1.0, 1.0, 1.0).normalize();
+            xw.add(y7);
+            xw.add(new THREE.GridHelper(10, 20, 0x374151, 0x1f2937));
+        }
+
+        function y8() {
+            if (y1) {
+                xw.remove(y1.scene);
+                y1.scene.traverse((o) => {
+                    if (o.isMesh) {
+                        o.geometry.dispose();
+                        if (o.material.isMaterial) o.material.dispose();
+                        else if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+                    }
+                });
+                y1 = null;
+            }
+            if (g1) {
+                URL.revokeObjectURL(g1);
+                g1 = null;
+            }
+        }
+
+        window.y9 = function() {
+            if (!xz) return;
+            xz.target.copy(y4);
+            xx.position.set(y4.x, y4.y + 0.05, y4.z + 1.2);
+            xz.update();
+        };
+
+        function z1(xv, z2) {
+            window.x4('p2');
+            if (!xw) y5();
+            document.getElementById('t1').innerText = z2;
+            const z3 = document.getElementById('l1');
+            z3.style.opacity = '1';
+            y8();
+            g1 = xv;
+            const z4 = new GLTFLoader();
+            z4.register((p) => new VRMLoaderPlugin(p));
+            z4.load(
+                xv,
+                (z5) => {
+                    const z6 = z5.userData.vrm;
+                    y1 = z6;
+                    xw.add(z6.scene);
+                    z6.scene.rotation.y = Math.PI;
+                    z6.scene.updateMatrixWorld(true);
+                    let z7 = false;
+                    y4.set(0, 1.4, 0);
+                    if (z6.humanoid) {
+                        const z8 = z6.humanoid.getNormalizedBoneNode('head');
+                        if (z8) {
+                            z8.getWorldPosition(y4);
+                            z7 = true;
+                        }
+                    }
+                    if (!z7) {
+                        const z9 = new THREE.Box3().setFromObject(z6.scene);
+                        y4.set(0, z9.max.y * 0.9, 0);
+                    }
+                    window.y9();
+                    z3.style.opacity = '0';
+                    w2();
+                },
+                undefined,
+                (e) => {
+                    z3.style.opacity = '0';
+                    document.getElementById('e1').innerText = 'エラーが発生しました。';
+                    document.getElementById('e1').classList.remove('hidden');
+                    window.x6();
+                }
+            );
+        }
+
+        const w1 = new THREE.Clock();
+        function w2() {
+            if (!y3) { y3 = true; w4(); }
+        }
+        function w3() {
+            y3 = false;
+            if (y2) { cancelAnimationFrame(y2); y2 = null; }
+        }
+        function w4() {
+            if (!y3) return;
+            y2 = requestAnimationFrame(w4);
+            if (y1) y1.update(w1.getDelta());
+            if (xz) xz.update();
+            if (xy && xw && xx) xy.render(xw, xx);
+        }
+
+        window.addEventListener('resize', () => {
+            if (!xy || !xx) return;
+            const y6 = document.getElementById('c1');
+            if (y6) {
+                xx.aspect = y6.clientWidth / y6.clientHeight;
+                xx.updateProjectionMatrix();
+                xy.setSize(y6.clientWidth, y6.clientHeight);
+            }
+        });
+    </script>
+</body>
+</html>
