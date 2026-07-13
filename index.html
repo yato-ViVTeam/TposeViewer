@@ -137,7 +137,7 @@
         // クラッシュ検知
         if (sessionStorage.getItem('f1') === '1') {
             sessionStorage.removeItem('f1');
-            setTimeout(() => alert("前回の読み込みでメモリ限界に達しました。\n\nこのモデルはiPhoneでは表示が難しい可能性があります。PC推奨。"), 600);
+            setTimeout(() => alert("前回の読み込みでメモリ限界に達しました。\n\nこのモデルはスマートフォンの処理能力（VRAM）を超えている可能性が高いです。PC環境での確認をお願いいたします。"), 600);
         }
 
         function x2() {
@@ -226,7 +226,7 @@
                 const header = new TextDecoder().decode(new Uint8Array(xk, 0, 4));
                 const xl = document.getElementById('e1');
 
-                // ユーザーコードで消えていたエラー処理と期限チェックを復元
+                // エラー処理と期限チェック
                 if (!/^\d{4}$/.test(header)) {
                     sessionStorage.removeItem('f1');
                     window.x4('p1');
@@ -267,21 +267,26 @@
             y6.innerHTML = '';
             xw = new THREE.Scene();
 
-            xy = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: "low-power" });
+            xy = new THREE.WebGLRenderer({ antialias: !x1, alpha: true });
             xy.setSize(y6.clientWidth, y6.clientHeight);
-            xy.setPixelRatio(1);
+            xy.setPixelRatio(x1 ? 1 : Math.min(window.devicePixelRatio, 2));
             xy.outputColorSpace = THREE.SRGBColorSpace;
+            xy.toneMapping = THREE.NoToneMapping;
             y6.appendChild(xy.domElement);
 
-            xx = new THREE.PerspectiveCamera(35, y6.clientWidth / y6.clientHeight, 0.1, 12.0);
+            xx = new THREE.PerspectiveCamera(35, y6.clientWidth / y6.clientHeight, 0.1, 20.0);
             xz = new OrbitControls(xx, xy.domElement);
             xz.enableDamping = true;
-            xz.dampingFactor = 0.12;
+            xz.dampingFactor = 0.05;
             xz.enableZoom = true;
+            xz.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
             xz.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
 
-            xw.add(new THREE.DirectionalLight(0xffffff, 0.9));
-            xw.add(new THREE.AmbientLight(0xcccccc, 0.6));
+            // ライトの色味を本来の明るさに戻す
+            const y7 = new THREE.DirectionalLight(0xffffff, Math.PI);
+            y7.position.set(1.0, 1.0, 1.0).normalize();
+            xw.add(y7);
+            xw.add(new THREE.GridHelper(10, 20, 0x374151, 0x1f2937));
         }
 
         function y8() {
@@ -309,7 +314,7 @@
         window.y9 = function() {
             if (!xz) return;
             xz.target.copy(y4);
-            xx.position.set(y4.x, y4.y + 0.05, y4.z + 1.5);
+            xx.position.set(y4.x, y4.y + 0.05, y4.z + 1.2);
             xz.update();
         };
 
@@ -345,15 +350,16 @@
                         y4.copy(pos);
                         window.y9();
 
-                        u2('初回描画準備...');
+                        u2('初回描画準備 (メモリ最適化中)...');
 
-                        requestAnimationFrame(() => {
+                        // iPhoneのために1.5秒の待機時間を設け、確実にガベージコレクションを促す
+                        setTimeout(() => {
                             sessionStorage.removeItem('f1');
                             z3.style.opacity = '0';
                             w2();
                             xu = null;
                             console.log('%c[成功] 初回描画開始', 'color:lime;font-weight:bold');
-                        });
+                        }, 1500);
                     });
                 });
             }, (e) => {
