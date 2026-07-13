@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TposeViewer</title>
+    <title>TopseViewer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -218,28 +218,32 @@
                 let xk = e.target.result;
                 const xl = document.getElementById('e1');
                 
-                if (xf.name.toLowerCase().endsWith('.viviondat')) {
-                    xk = x7(xk, x9);
-                    const xm = new Uint8Array(xk, 0, 4);
-                    const xn = new TextDecoder().decode(xm);
-                    if (!/^\d{4}$/.test(xn)) {
-                        xl.innerText = 'パスワードが間違っているか、ファイルが破損しています。';
-                        xl.classList.remove('hidden');
-                        xd.value = ''; return;
-                    }
-                    const xo = 2000 + parseInt(xn.substring(0, 2), 10);
-                    const xp = parseInt(xn.substring(2, 4), 10);
-                    const xq = new Date();
-                    const xr = xq.getFullYear();
-                    const xs = xq.getMonth() + 1;
-                    const xt = (xr - xo) * 12 + (xs - xp);
-                    if (xt >= 4) { 
-                        xl.innerText = 'ファイルの有効期限が切れているため読み込めませんでした。管理者に新しいデータを要求してください。';
-                        xl.classList.remove('hidden');
-                        xd.value = ''; return;
-                    }
-                    xk = xk.slice(4);
+                // スマホ特有の拡張子消失対策: 条件分岐を無くし、強制的に復号と期限チェックを実行する
+                xk = x7(xk, x9);
+                const xm = new Uint8Array(xk, 0, 4);
+                const xn = new TextDecoder().decode(xm);
+                
+                if (!/^\d{4}$/.test(xn)) {
+                    xl.innerText = 'パスワードが間違っているか、ファイルが破損しています。';
+                    xl.classList.remove('hidden');
+                    xd.value = ''; return;
                 }
+                
+                const xo = 2000 + parseInt(xn.substring(0, 2), 10);
+                const xp = parseInt(xn.substring(2, 4), 10);
+                const xq = new Date();
+                const xr = xq.getFullYear();
+                const xs = xq.getMonth() + 1;
+                const xt = (xr - xo) * 12 + (xs - xp);
+                
+                if (xt >= 4) { 
+                    xl.innerText = 'ファイルの有効期限が切れているため読み込めませんでした。管理者に新しいデータを要求してください。';
+                    xl.classList.remove('hidden');
+                    xd.value = ''; return;
+                }
+                
+                xk = xk.slice(4);
+                
                 const xu = new Blob([xk], { type: 'application/octet-stream' });
                 const xv = URL.createObjectURL(xu);
                 z1(xv, xf.name);
