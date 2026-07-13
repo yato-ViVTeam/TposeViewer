@@ -205,7 +205,7 @@
             
             const xh = document.getElementById('d2');
             xh.innerHTML = '';
-            for (let i = 0; i < 200; i++) {
+            for (let i = 0; i < 50; i++) {
                 const xi = document.createElement('span');
                 xi.className = 'p-6 whitespace-nowrap';
                 xi.textContent = x9;
@@ -242,28 +242,24 @@
                     xd.value = ''; return;
                 }
                 
-                const xw2 = new Uint8Array(xk, 4); 
-                const xu = new Blob([xw2], { type: 'application/octet-stream' });
-                const xv = URL.createObjectURL(xu);
-                
+                let xu = xk.slice(4);
                 xk = null; 
                 
-                z1(xv, xf.name);
+                z1(xu, xf.name);
             };
             xj.readAsArrayBuffer(xf);
         }
 
         let xw, xx, xy, xz, y1, y2, y3;
-        let g1 = null;
         let y4 = new THREE.Vector3(0, 1.4, 0);
 
         function y5() {
             const y6 = document.getElementById('c1');
             y6.innerHTML = '';
             xw = new THREE.Scene();
-            xy = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            xy = new THREE.WebGLRenderer({ antialias: !x1, alpha: true });
             xy.setSize(y6.clientWidth, y6.clientHeight);
-            xy.setPixelRatio(window.devicePixelRatio);
+            xy.setPixelRatio(x1 ? 1 : Math.min(window.devicePixelRatio, 2));
             xy.outputColorSpace = THREE.SRGBColorSpace;
             xy.toneMapping = THREE.NoToneMapping; 
             y6.appendChild(xy.domElement);
@@ -292,10 +288,6 @@
                 });
                 y1 = null;
             }
-            if (g1) {
-                URL.revokeObjectURL(g1);
-                g1 = null;
-            }
         }
 
         window.y9 = function() {
@@ -305,54 +297,67 @@
             xz.update();
         };
 
-        function z1(xv, z2) {
+        function z1(xu, z2) {
             window.x4('p2');
             if (!xw) y5();
             document.getElementById('t1').innerText = z2;
             const z3 = document.getElementById('l1');
             z3.style.opacity = '1';
             y8();
-            g1 = xv;
             
             const z4 = new GLTFLoader();
             z4.register((p) => new VRMLoaderPlugin(p));
-            z4.load(
-                xv,
-                (z5) => {
-                    const z6 = z5.userData.vrm;
-                    y1 = z6;
-                    xw.add(z6.scene);
-                    z6.scene.rotation.y = Math.PI;
-                    z6.scene.updateMatrixWorld(true);
-                    
-                    let z7 = false;
-                    y4.set(0, 1.4, 0);
-                    if (z6.humanoid) {
-                        const z8 = z6.humanoid.getNormalizedBoneNode('head');
-                        if (z8) {
-                            z8.getWorldPosition(y4);
-                            z7 = true;
+            
+            try {
+                z4.parse(
+                    xu,
+                    '',
+                    (z5) => {
+                        const z6 = z5.userData.vrm;
+                        y1 = z6;
+                        xw.add(z6.scene);
+                        z6.scene.rotation.y = Math.PI;
+                        z6.scene.updateMatrixWorld(true);
+                        
+                        let z7 = false;
+                        y4.set(0, 1.4, 0);
+                        if (z6.humanoid) {
+                            const z8 = z6.humanoid.getNormalizedBoneNode('head');
+                            if (z8) {
+                                z8.getWorldPosition(y4);
+                                z7 = true;
+                            }
                         }
+                        if (!z7) {
+                            const z9 = new THREE.Box3().setFromObject(z6.scene);
+                            y4.set(0, z9.max.y * 0.9, 0);
+                        }
+                        
+                        window.y9();
+                        z3.style.opacity = '0';
+                        w2();
+                        
+                        xu = null;
+                    },
+                    (e) => {
+                        z3.style.opacity = '0';
+                        window.x4('p1');
+                        const xl = document.getElementById('e1');
+                        xl.innerText = 'エラーが発生しました。ファイルが破損している可能性があります。';
+                        xl.classList.remove('hidden');
+                        document.getElementById('i3').value = '';
+                        xu = null;
                     }
-                    if (!z7) {
-                        const z9 = new THREE.Box3().setFromObject(z6.scene);
-                        y4.set(0, z9.max.y * 0.9, 0);
-                    }
-                    
-                    window.y9();
-                    z3.style.opacity = '0';
-                    w2();
-                },
-                undefined,
-                (e) => {
-                    z3.style.opacity = '0';
-                    window.x4('p1');
-                    const xl = document.getElementById('e1');
-                    xl.innerText = 'エラーが発生しました。ファイルが破損している可能性があります。';
-                    xl.classList.remove('hidden');
-                    document.getElementById('i3').value = '';
-                }
-            );
+                );
+            } catch (err) {
+                z3.style.opacity = '0';
+                window.x4('p1');
+                const xl = document.getElementById('e1');
+                xl.innerText = 'エラーが発生しました。ファイルが破損している可能性があります。';
+                xl.classList.remove('hidden');
+                document.getElementById('i3').value = '';
+                xu = null;
+            }
         }
 
         const w1 = new THREE.Clock();
