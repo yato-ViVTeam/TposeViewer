@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>TopseViewer</title>
+    <title>TopseViewer2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -134,10 +134,10 @@
         lucide.createIcons();
         const x1 = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-        // クラッシュ検知
-        if (sessionStorage.getItem('f1') === '1') {
-            sessionStorage.removeItem('f1');
-            setTimeout(() => alert("前回の読み込みでメモリ限界に達しました。\n\nこのモデルはスマートフォンの処理能力（VRAM）を超えている可能性が高いです。PC環境での確認をお願いいたします。"), 600);
+        // クラッシュ完全検知: localStorageを使用し、より強固に検知する
+        if (localStorage.getItem('f1') === '1') {
+            localStorage.removeItem('f1');
+            setTimeout(() => alert("【システム通知】\n前回の読み込み中にスマートフォンのメモリ（グラフィックス処理能力）の限界に達し、OSによりブラウザが強制再起動されました。\n\nこのモデルはスマートフォンでは表示できません。PC環境での確認をお願いいたします。"), 600);
         }
 
         function x2() {
@@ -167,7 +167,7 @@
             window.x4('p1');
             y8();
             document.getElementById('i3').value = '';
-            sessionStorage.removeItem('f1');
+            localStorage.removeItem('f1');
         };
 
         function x7(x8, x9) {
@@ -198,7 +198,9 @@
             const xg = document.getElementById('i2').checked;
             if (!x9 || !xg) { alert('パスワードと同意チェックを入力してください。'); xd.value = ''; return; }
 
-            sessionStorage.setItem('f1', '1');
+            // 読み込み開始時にフラグを立てる
+            localStorage.setItem('f1', '1');
+            
             window.x4('p2');
             const z3 = document.getElementById('l1');
             z3.style.opacity = '1';
@@ -228,7 +230,7 @@
 
                 // エラー処理と期限チェック
                 if (!/^\d{4}$/.test(header)) {
-                    sessionStorage.removeItem('f1');
+                    localStorage.removeItem('f1');
                     window.x4('p1');
                     xl.innerText = 'エラー: パスワード誤り、またはファイル破損';
                     xl.classList.remove('hidden');
@@ -244,7 +246,7 @@
                 const xt = (xr - xo) * 12 + (xs - xp);
                 
                 if (xt >= 4) { 
-                    sessionStorage.removeItem('f1');
+                    localStorage.removeItem('f1');
                     window.x4('p1');
                     xl.innerText = 'エラー: ファイルの有効期限が切れています。';
                     xl.classList.remove('hidden');
@@ -282,7 +284,6 @@
             xz.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
             xz.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
 
-            // ライトの色味を本来の明るさに戻す
             const y7 = new THREE.DirectionalLight(0xffffff, Math.PI);
             y7.position.set(1.0, 1.0, 1.0).normalize();
             xw.add(y7);
@@ -308,7 +309,6 @@
                 });
                 y1 = null;
             }
-            if (xy?.info) console.log('[Memory]', xy.info.memory);
         }
 
         window.y9 = function() {
@@ -352,13 +352,12 @@
 
                         u2('初回描画準備 (メモリ最適化中)...');
 
-                        // iPhoneのために1.5秒の待機時間を設け、確実にガベージコレクションを促す
                         setTimeout(() => {
-                            sessionStorage.removeItem('f1');
+                            // ※ここではまだフラグを消しません
                             z3.style.opacity = '0';
                             w2();
                             xu = null;
-                            console.log('%c[成功] 初回描画開始', 'color:lime;font-weight:bold');
+                            console.log('%c[成功] 描画処理へ移行', 'color:lime;font-weight:bold');
                         }, 1500);
                     });
                 });
@@ -370,7 +369,7 @@
                 xl.innerText = 'エラー: ファイル読み込みに失敗しました。';
                 xl.classList.remove('hidden');
                 document.getElementById('i3').value = '';
-                sessionStorage.removeItem('f1');
+                localStorage.removeItem('f1');
             });
         }
 
@@ -382,7 +381,15 @@
             y2 = requestAnimationFrame(w4);
             if (y1) y1.update(w1.getDelta());
             if (xz) xz.update();
-            if (xy && xw && xx) xy.render(xw, xx);
+            if (xy && xw && xx) {
+                // ここで実際にiPhoneのGPUにデータが送られ描画される (最も落ちやすいポイント)
+                xy.render(xw, xx);
+                
+                // 第1フレーム目が「無事に描画できたら」初めて安全フラグを下ろす
+                if (localStorage.getItem('f1') === '1') {
+                    localStorage.removeItem('f1');
+                }
+            }
         }
 
         window.addEventListener('resize', () => {
