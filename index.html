@@ -59,6 +59,7 @@
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">復号パスワード</label>
                     <input type="password" id="i1" required 
+                        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                         class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition-colors" 
                         placeholder="パスワードを入力">
                     <p class="mt-2 text-xs text-rose-400 font-semibold flex items-start gap-1">
@@ -191,7 +192,7 @@
         });
 
         function xe(xf) {
-            const x9 = document.getElementById('i1').value;
+            const x9 = document.getElementById('i1').value.trim();
             const xg = document.getElementById('i2').checked;
             if (!x9) { 
                 alert('先に復号パスワードを入力してください。'); 
@@ -218,7 +219,6 @@
                 let xk = e.target.result;
                 const xl = document.getElementById('e1');
                 
-                // スマホ特有の拡張子消失対策: 条件分岐を無くし、強制的に復号と期限チェックを実行する
                 xk = x7(xk, x9);
                 const xm = new Uint8Array(xk, 0, 4);
                 const xn = new TextDecoder().decode(xm);
@@ -242,10 +242,15 @@
                     xd.value = ''; return;
                 }
                 
-                xk = xk.slice(4);
+                // メモリクラッシュ対策：sliceによるデータの複製を廃止し、省メモリなViewを作成
+                const xw2 = new Uint8Array(xk, 4); 
                 
-                const xu = new Blob([xk], { type: 'application/octet-stream' });
+                const xu = new Blob([xw2], { type: 'application/octet-stream' });
                 const xv = URL.createObjectURL(xu);
+                
+                // 元の巨大なバッファを強制的にガベージコレクションの対象にする
+                xk = null;
+                
                 z1(xv, xf.name);
             };
             xj.readAsArrayBuffer(xf);
@@ -261,7 +266,10 @@
             xw = new THREE.Scene();
             xy = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             xy.setSize(y6.clientWidth, y6.clientHeight);
-            xy.setPixelRatio(window.devicePixelRatio);
+            
+            // スマホの激重化とメモリ消費を防ぐため、デバイスピクセル比の上限を2に制限
+            xy.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            
             xy.outputColorSpace = THREE.SRGBColorSpace;
             xy.toneMapping = THREE.NoToneMapping; 
             y6.appendChild(xy.domElement);
