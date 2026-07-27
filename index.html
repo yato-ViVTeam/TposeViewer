@@ -82,7 +82,6 @@
                     <div id="d1" class="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center transition-colors hover:border-indigo-500 cursor-pointer bg-slate-950/50">
                         <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-500 mx-auto mb-2"></i>
                         <p class="text-sm font-medium text-slate-300">ここをタップしてファイルを選択<br><span class="text-xs text-slate-500 font-normal">またはドラッグ＆ドロップ</span></p>
-                        <!-- iPad回避策: accept属性を削除し全ファイル選択可能に -->
                         <input type="file" id="i3" class="hidden">
                     </div>
                 </div>
@@ -134,7 +133,6 @@
         lucide.createIcons();
         const x1 = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-        // クラッシュ検知
         if (localStorage.getItem('f1') === '1') {
             localStorage.removeItem('f1');
             setTimeout(() => alert("【システム通知】\n前回の読み込み中にスマートフォンのメモリ（グラフィックス処理能力）の限界に達し、OSによりブラウザが強制再起動されました。\n\nこのモデルはスマートフォンでは表示できません。PC環境での確認をお願いいたします。"), 600);
@@ -197,7 +195,6 @@
             const xg = document.getElementById('i2').checked;
             if (!x9 || !xg) { alert('パスワードと同意チェックを入力してください。'); xd.value = ''; return; }
 
-            // クラッシュ検知用のフラグを立てる
             localStorage.setItem('f1', '1');
             
             window.x4('p2');
@@ -231,14 +228,18 @@
                     return;
                 }
 
-                const xo = 2000 + parseInt(header.substring(0, 2), 10);
-                const xp = parseInt(header.substring(2, 4), 10);
-                const xq = new Date();
-                const xr = xq.getFullYear();
-                const xs = xq.getMonth() + 1;
-                const xt = (xr - xo) * 12 + (xs - xp);
+                // 正確な有効期限の判定ロジック（年月の通算比較）
+                const expYear = 2000 + parseInt(header.substring(0, 2), 10);
+                const expMonth = parseInt(header.substring(2, 4), 10);
                 
-                if (xt >= 4) { 
+                const now = new Date();
+                const currentYear = now.getFullYear();
+                const currentMonth = now.getMonth() + 1;
+
+                const currentMonths = currentYear * 12 + currentMonth;
+                const expireMonths = expYear * 12 + expMonth;
+
+                if (currentMonths > expireMonths) { 
                     localStorage.removeItem('f1');
                     window.x4('p1');
                     xl.innerText = 'エラー: ファイルの有効期限が切れています。';
@@ -247,12 +248,11 @@
                     return;
                 }
 
-                // 真の解決策: sliceによる丸ごとコピーを廃止し、参照(View)からBlobを作るゼロコピー方式
                 const view = new Uint8Array(xk, 4);
                 const xu = new Blob([view], { type: 'application/octet-stream' });
                 const xv = URL.createObjectURL(xu);
                 
-                xk = null; // 大元のメモリ参照を即座に切る
+                xk = null;
                 z1(xv, xf.name);
             };
             xj.readAsArrayBuffer(xf);
@@ -281,7 +281,6 @@
             xz.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
             xz.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
 
-            // ライトの色味を本来の明るさに戻す
             const y7 = new THREE.DirectionalLight(0xffffff, Math.PI);
             y7.position.set(1.0, 1.0, 1.0).normalize();
             xw.add(y7);
@@ -322,7 +321,6 @@
             const z3 = document.getElementById('l1');
             y8();
 
-            // いちばん安定していた「Blob URLからの直接ロード」に戻す
             const loader = new GLTFLoader();
             loader.register(p => new VRMLoaderPlugin(p));
 
@@ -345,7 +343,6 @@
                     }
                     window.y9();
 
-                    // メモリ確保のため、モデルが組み上がった瞬間にBlob URLを捨てる
                     URL.revokeObjectURL(xv);
 
                     z3.style.opacity = '0';
@@ -374,10 +371,8 @@
             if (y1) y1.update(w1.getDelta());
             if (xz) xz.update();
             if (xy && xw && xx) {
-                // ここで実際にiPhoneのGPUにデータが送られ描画される (最も落ちやすいポイント)
                 xy.render(xw, xx);
                 
-                // 第1フレーム目が「無事に描画できたら」初めて安全フラグを下ろす
                 if (localStorage.getItem('f1') === '1') {
                     localStorage.removeItem('f1');
                 }
