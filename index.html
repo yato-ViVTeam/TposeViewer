@@ -441,10 +441,18 @@
                     seen.add(m.uuid);
                     bs.mats.push({
                         mat: m,
+                        mesh: o,
+                        meshLabel: label,
                         name: m.name || label,
+                        type: m.type || m.constructor?.name || '?',
+                        isMToon: !!m.isMToonMaterial,
                         wasTransparent: !!m.transparent,
                         depthWrite: m.depthWrite,
+                        depthTest: m.depthTest,
                         alphaTest: m.alphaTest || 0,
+                        side: m.side,
+                        blending: m.blending,
+                        renderOrder: o.renderOrder,
                         zw: ('transparentWithZWrite' in m) ? m.transparentWithZWrite : undefined
                     });
                 });
@@ -547,8 +555,39 @@
                     <input type="range" min="0" max="100" step="1" value="${cut}" data-cut="1" class="w-full mt-1.5 h-4 accent-indigo-500 cursor-pointer">
                     <p class="text-slate-500 text-[10px] mt-1">0%＝ブレンドのまま。上げると薄いピクセルを切り抜き（Cutout化）し、髪の荷透けを押さえます。目元が透ける場合は 40〜60% が目安です。</p>
                 </div>
-                <div class="text-slate-500 text-[10px] border-t border-slate-800 pt-2">半透明マテリアル: ${tCount} / 全 ${(bs.mats || []).length}</div>
+                <div class="border-t border-slate-800 pt-2 space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-slate-500 text-[10px]">半透明マテリアル: ${tCount} / 全 ${(bs.mats || []).length}</span>
+                        <button data-diag="1" class="px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[10px] text-slate-300 hover:text-white">診断情報をコピー</button>
+                    </div>
+                    <div class="max-h-40 overflow-y-auto rounded-lg bg-slate-950 border border-slate-800 p-2 text-[9px] leading-relaxed text-slate-400 font-mono whitespace-pre-wrap">${bsEsc(bsDiagText())}</div>
+                </div>
             </div>`;
+        }
+
+        function bsDiagText() {
+            if (!bs.mats || !bs.mats.length) return '(モデル未読み込み)';
+            const meta = y1?.meta || {};
+            const head = [
+                `VRM meta: ${meta.metaVersion ?? meta.specVersion ?? '?'} / three-vrm loaded`,
+                `expressions: ${bs.expr.length}, morphs: ${bs.morph.length}, meshes: ${bs.parts.length}`,
+                '--- materials ---'
+            ];
+            const rows = bs.mats.map((m) => [
+                m.name,
+                m.type,
+                m.isMToon ? 'MToon' : 'non-MToon',
+                `transparent=${m.wasTransparent}`,
+                `zwrite=${m.depthWrite}`,
+                `ztest=${m.depthTest}`,
+                `alphaTest=${m.alphaTest}`,
+                `zWriteProp=${m.zw}`,
+                `side=${m.side}`,
+                `blend=${m.blending}`,
+                `renderOrder=${m.renderOrder}`,
+                `mesh=${m.meshLabel}`
+            ].join(' | '));
+            return head.concat(rows).join('\n');
         }
 
         function bsApplyRenderFix() {
@@ -626,6 +665,9 @@
             });
             body.addEventListener('change', (e) => {
                 const t = e.target;
+                if (t.dataset.diag) {
+                    return;
+                }
                 if (t.dataset.fix === 'zwrite') {
                     bsFix.zwrite = t.checked;
                     bsApplyRenderFix();
@@ -634,6 +676,18 @@
                 if (t.dataset.vis !== undefined && t.type === 'checkbox') {
                     const p = bs.parts[parseInt(t.dataset.vis, 10)];
                     if (p) p.mesh.visible = t.checked;
+                }
+            });
+            body.addEventListener('click', (e) => {
+                const b = e.target.closest('[data-diag]');
+                if (!b) return;
+                const txt = bsDiagText();
+                console.log(txt);
+                if (navigator.clipboard?.writeText) {
+                    navigator.clipboard.writeText(txt).then(() => { b.textContent = 'コピーしました'; setTimeout(() => { b.textContent = '診断情報をコピー'; }, 1500); })
+                        .catch(() => { b.textContent = 'コンソールに出力'; });
+                } else {
+                    b.textContent = 'コンソールに出力';
                 }
             });
         }
@@ -657,6 +711,7 @@
             bsCollect(vrm);
             document.getElementById('bsSearch').value = '';
             bsApplyRenderFix();
+            console.log('[VRM diagnostics]\n' + bsDiagText());
             bs.tab = bs.expr.length ? 'exp' : (bs.morph.length ? 'bs' : 'parts');
             document.getElementById('bsOpen').style.display = 'flex';
             bs.open = false;
