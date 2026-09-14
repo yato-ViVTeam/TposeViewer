@@ -353,6 +353,12 @@
                 (gltf) => {
                     const z6 = gltf.userData.vrm;
                     y1 = z6;
+                    // VRM0 の materialProperties から Unity の Render Queue を取得（three-vrm は renderOrder に反映しないため）
+                    bs.queue = {};
+                    try {
+                        const mp = gltf.parser?.json?.extensions?.VRM?.materialProperties || [];
+                        mp.forEach((m) => { if (m.name && typeof m.renderQueue === 'number') bs.queue[m.name] = m.renderQueue; });
+                    } catch (err) { console.warn(err); }
                     // three-vrm 推奨の最適化（morph は統合しない：BlendShape 個別操作を毋すため）
                     try { VRMUtils.removeUnnecessaryVertices(gltf.scene); } catch (err) { console.warn(err); }
                     try { VRMUtils.combineSkeletons(gltf.scene); } catch (err) { console.warn(err); }
@@ -408,7 +414,21 @@
             { id: 'parts', label: 'パーツ' },
             { id: 'render', label: '描画' }
         ];
-        const bsFix = { zwrite: true, cutout: 0 };
+        const bsFix = { order: true, zwrite: false, cutout: 0, offset: true };
+
+        // VRM0の renderQueue 情報が失われて全マテリアルが同じ renderOrder になるケースの補正用優先度。
+        function bsPriority(name) {
+            // VRM 本体に Render Queue があればそれを最優先で使う（Unity と同じ描画順）
+            const base = (name || '').replace(/ \(Outline\)$/, '');
+            const q = bs.queue && bs.queue[base];
+            if (typeof q === 'number') return q - 2000;
+            const n = (name || '').toLowerCase();
+            if (/hairshadow/.test(n)) return 60;
+            if (/eyelashunder/.test(n)) return 50;
+            if (/specialeye|hightlight|highlight/.test(n)) return 40;
+            if (/aozame|tere|mangasymbol/.test(n)) return 30;
+            return 20;
+        }
 
         function bsEsc(s) {
             return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -539,13 +559,48 @@
             }
         }
 
+        function bsMatRow(i, m) {
+            const order = m.mesh.renderOrder;
+            const at = Math.round((m.mat.alphaTest || 0) * 100);
+            return `<div class="px-2 py-2 border-b border-slate-800/60">
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-medium text-slate-100 truncate" title="${bsEsc(m.name)}">${bsEsc(m.name)}</span>
+                    <span class="ml-auto shrink-0 text-[9px] px-1 rounded ${m.wasTransparent ? 'bg-amber-900/60 text-amber-200' : 'bg-slate-800 text-slate-400'}">${m.wasTransparent ? '透過' : '不透明'}</span>
+                </div>
+                <div class="flex items-center gap-2 mt-1.5">
+                    <label class="flex items-center gap-1 text-[9px] text-slate-400 cursor-pointer">
+                        <input type="checkbox" data-mzw="${i}" ${m.mat.depthWrite ? 'checked' : ''} class="w-3 h-3 accent-indigo-500 cursor-pointer">ZWrite
+                    </label>
+                    <label class="flex items-center gap-1 text-[9px] text-slate-400 cursor-pointer">
+                        <input type="checkbox" data-mzt="${i}" ${m.mat.depthTest ? 'checked' : ''} class="w-3 h-3 accent-indigo-500 cursor-pointer">ZTest
+                    </label>
+                    <label class="flex items-center gap-1 text-[9px] text-slate-400 ml-auto">order
+                        <input type="number" data-morder="${i}" value="${order}" class="w-14 bg-slate-950 border border-slate-800 rounded px-1 py-0.5 text-[9px] text-slate-100">
+                    </label>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="text-[9px] text-slate-500 shrink-0">cut</span>
+                    <input type="range" min="0" max="100" step="1" value="${at}" data-mcut="${i}" class="w-full h-3 accent-indigo-500 cursor-pointer">
+                    <span class="text-[9px] text-slate-400 tabular-nums w-8 text-right" data-out="mc|${i}">${at}%</span>
+                </div>
+            </div>`;
+        }
+
         function bsRenderTabBody() {
             const tCount = (bs.mats || []).filter((m) => m.wasTransparent).length;
             const cut = Math.round(bsFix.cutout * 100);
             return `<div class="px-3 py-3 space-y-3 text-[11px] text-slate-300">
                 <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" data-fix="order" ${bsFix.order ? 'checked' : ''} class="w-3.5 h-3.5 mt-0.5 shrink-0 accent-indigo-500 cursor-pointer">
+                    <span><span class="font-semibold text-white">描画順（renderOrder）自動補正</span><br><span class="text-slate-500 text-[10px]">このVRMは全マテリアルの renderOrder が 19 で均一です（UnityのRender Queueが保持されていない）。不透明→顔デカール→目ハイライト→下まつげ→髪影 の順に並べ直します。</span></span>
+                </label>
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" data-fix="offset" ${bsFix.offset ? 'checked' : ''} class="w-3.5 h-3.5 mt-0.5 shrink-0 accent-indigo-500 cursor-pointer">
+                    <span><span class="font-semibold text-white">デカールZファイト防止</span><br><span class="text-slate-500 text-[10px]">顔に密着した透過メッシュ（青ざめ・テレ・目デカール）のちらつき・欠けを抑制します。</span></span>
+                </label>
+                <label class="flex items-start gap-2 cursor-pointer">
                     <input type="checkbox" data-fix="zwrite" ${bsFix.zwrite ? 'checked' : ''} class="w-3.5 h-3.5 mt-0.5 shrink-0 accent-indigo-500 cursor-pointer">
-                    <span><span class="font-semibold text-white">透過ZWrite補正</span><br><span class="text-slate-500 text-[10px]">半透明マテリアルに深度書き込みを強制。前髪およびまつげ・瞳の前後関係を Unity の見え方に近づけます。</span></span>
+                    <span><span class="font-semibold text-white">透過ZWrite補正</span><br><span class="text-slate-500 text-[10px]">半透明マテリアルに深度書き込みを強制。通常はOFF推奨。</span></span>
                 </label>
                 <div>
                     <div class="flex items-center justify-between">
@@ -560,8 +615,12 @@
                         <span class="text-slate-500 text-[10px]">半透明マテリアル: ${tCount} / 全 ${(bs.mats || []).length}</span>
                         <button data-diag="1" class="px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[10px] text-slate-300 hover:text-white">診断情報をコピー</button>
                     </div>
-                    <div class="max-h-40 overflow-y-auto rounded-lg bg-slate-950 border border-slate-800 p-2 text-[9px] leading-relaxed text-slate-400 font-mono whitespace-pre-wrap">${bsEsc(bsDiagText())}</div>
+                    <div class="max-h-32 overflow-y-auto rounded-lg bg-slate-950 border border-slate-800 p-2 text-[9px] leading-relaxed text-slate-400 font-mono whitespace-pre-wrap">${bsEsc(bsDiagText())}</div>
                 </div>
+            </div>
+            <div class="border-t border-slate-800">
+                <div class="px-3 py-2 text-[10px] font-semibold text-white bg-slate-900/60">マテリアル個別調整</div>
+                ${(bs.mats || []).map((m, i) => bsMatRow(i, m)).join('')}
             </div>`;
         }
 
@@ -592,17 +651,32 @@
 
         function bsApplyRenderFix() {
             (bs.mats || []).forEach((m) => {
-                if (!m.wasTransparent) return;
                 const mat = m.mat;
-                if (bsFix.zwrite) {
-                    if (m.zw !== undefined) mat.transparentWithZWrite = true;
-                    mat.depthWrite = true;
-                } else {
-                    if (m.zw !== undefined) mat.transparentWithZWrite = m.zw;
-                    mat.depthWrite = m.depthWrite;
+                // カットオフは不透明マテリアルにも効く（髪の荷透け対策）。
+                if (m.userOrder === undefined) {
+                    mat.alphaTest = bsFix.cutout > 0 ? bsFix.cutout : m.alphaTest;
                 }
-                mat.alphaTest = bsFix.cutout > 0 ? bsFix.cutout : m.alphaTest;
+                if (m.wasTransparent) {
+                    if (bsFix.zwrite) {
+                        if (m.zw !== undefined) mat.transparentWithZWrite = true;
+                        mat.depthWrite = true;
+                    } else {
+                        if (m.zw !== undefined) mat.transparentWithZWrite = m.zw;
+                        mat.depthWrite = m.depthWrite;
+                    }
+                    // 顔に密着したデカールの Zファイト防止
+                    mat.polygonOffset = !!bsFix.offset;
+                    mat.polygonOffsetFactor = bsFix.offset ? -1 : 0;
+                    mat.polygonOffsetUnits = bsFix.offset ? -(bsPriority(m.name) / 10) : 0;
+                }
                 mat.needsUpdate = true;
+
+                // 描画順（renderOrder）
+                let order;
+                if (m.userOrder !== undefined) order = m.userOrder;
+                else if (!bsFix.order) order = m.renderOrder;
+                else order = m.wasTransparent ? bsPriority(m.name) : 0;
+                m.mesh.renderOrder = order;
             });
         }
 
@@ -652,6 +726,11 @@
                             if (m.mesh.morphTargetInfluences) m.mesh.morphTargetInfluences[m.index] = v;
                         }
                     }
+                } else if (t.dataset.mcut !== undefined && t.type === 'range') {
+                    const m = bs.mats[parseInt(t.dataset.mcut, 10)];
+                    const pct = parseInt(t.value, 10);
+                    if (m) { m.mat.alphaTest = pct / 100; m.mat.needsUpdate = true; }
+                    bsSetOut(`mc|${t.dataset.mcut}`, pct);
                 } else if (t.dataset.cut) {
                     const pct = parseInt(t.value, 10);
                     bsFix.cutout = pct / 100;
@@ -668,9 +747,26 @@
                 if (t.dataset.diag) {
                     return;
                 }
-                if (t.dataset.fix === 'zwrite') {
-                    bsFix.zwrite = t.checked;
+                if (t.dataset.fix) {
+                    bsFix[t.dataset.fix] = t.checked;
                     bsApplyRenderFix();
+                    bsRender();
+                    return;
+                }
+                if (t.dataset.mzw !== undefined && t.type === 'checkbox') {
+                    const m = bs.mats[parseInt(t.dataset.mzw, 10)];
+                    if (m) { m.mat.depthWrite = t.checked; m.mat.needsUpdate = true; }
+                    return;
+                }
+                if (t.dataset.mzt !== undefined && t.type === 'checkbox') {
+                    const m = bs.mats[parseInt(t.dataset.mzt, 10)];
+                    if (m) { m.mat.depthTest = t.checked; m.mat.needsUpdate = true; }
+                    return;
+                }
+                if (t.dataset.morder !== undefined && t.type === 'number') {
+                    const m = bs.mats[parseInt(t.dataset.morder, 10)];
+                    const v = parseInt(t.value, 10);
+                    if (m && !Number.isNaN(v)) { m.userOrder = v; m.mesh.renderOrder = v; }
                     return;
                 }
                 if (t.dataset.vis !== undefined && t.type === 'checkbox') {
