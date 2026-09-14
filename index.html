@@ -90,7 +90,7 @@
                 </div>
             </div>
             <div class="mt-6 pt-4 border-t border-slate-800/60 text-center">
-                <p class="text-[10px] text-slate-500">※ファイルの復号はすべてお使いの端末(ブラウザ上)で行われます。<br>サーバーへのデータ送信は一切行われません。</p>
+                <p class="text-[10px] text-slate-500">※ファイルの復号はすべてお使いの端末(ブラウザ上)で行われます。<br>サーバーへのデータ送信は一切行われませ�����。</p>
             </div>
         </div>
     </div>
@@ -414,7 +414,29 @@
             { id: 'parts', label: 'パーツ' },
             { id: 'render', label: '描画' }
         ];
-        const bsFix = { order: true, zwrite: false, cutout: 0, offset: true };
+        const bsFix = { order: true, zwrite: false, cutout: 0, offset: true, autocut: false, shade: true };
+
+        // 不透明扱いなのにベーステクスチャに透明部分があるマテリアルを検出する（まつ毛など）。
+        function bsTexHasAlpha(tex) {
+            try {
+                const img = tex?.image;
+                if (!img) return false;
+                const w = img.width || img.videoWidth, h = img.height || img.videoHeight;
+                if (!w || !h) return false;
+                const n = 128;
+                const cv = document.createElement('canvas');
+                cv.width = n; cv.height = n;
+                const ctx = cv.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0, n, n);
+                const d = ctx.getImageData(0, 0, n, n).data;
+                let t = 0;
+                for (let i = 3; i < d.length; i += 4) if (d[i] < 200) t++;
+                return t / (n * n) > 0.01;
+            } catch (err) {
+                console.warn('alpha check failed', err);
+                return false;
+            }
+        }
 
         // VRM0の renderQueue 情報が失われて全マテリアルが同じ renderOrder になるケースの補正用優先度。
         function bsPriority(name) {
@@ -473,7 +495,10 @@
                         side: m.side,
                         blending: m.blending,
                         renderOrder: o.renderOrder,
-                        zw: ('transparentWithZWrite' in m) ? m.transparentWithZWrite : undefined
+                        zw: ('transparentWithZWrite' in m) ? m.transparentWithZWrite : undefined,
+                        texAlpha: (!m.transparent && !(m.alphaTest > 0)) ? bsTexHasAlpha(m.map) : false,
+                        origShadeTex: ('shadeMultiplyTexture' in m) ? (m.shadeMultiplyTexture || null) : undefined,
+                        origShadeColor: (m.shadeColorFactor && m.shadeColorFactor.clone) ? m.shadeColorFactor.clone() : undefined
                     });
                 });
                 if (o.morphTargetDictionary) {
@@ -595,6 +620,14 @@
                     <span><span class="font-semibold text-white">描画順（renderOrder）自動補正</span><br><span class="text-slate-500 text-[10px]">このVRMは全マテリアルの renderOrder が 19 で均一です（UnityのRender Queueが保持されていない）。不透明→顔デカール→目ハイライト→下まつげ→髪影 の順に並べ直します。</span></span>
                 </label>
                 <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" data-fix="shade" ${bsFix.shade ? 'checked' : ''} class="w-3.5 h-3.5 mt-0.5 shrink-0 accent-indigo-500 cursor-pointer">
+                    <span><span class="font-semibold text-white">シェード色の補正（まつ毛の白飛び対策）</span><br><span class="text-slate-500 text-[10px]">_ShadeTexture を持たない MToon マテリアルは陰の色が白になり、まつ毛など濃色パーツが灰白色に見えます。ベーステクスチャを陰テクスチャとして割り当てて本来の色に戻します。</span></span>
+                </label>
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" data-fix="autocut" ${bsFix.autocut ? 'checked' : ''} class="w-3.5 h-3.5 mt-0.5 shrink-0 accent-indigo-500 cursor-pointer">
+                    <span><span class="font-semibold text-white">アルファ付きテクスチャの自動カットアウト</span><br><span class="text-slate-500 text-[10px]">不透明指定なのにテクスチャに透明部分を持つマテリアル（まつ毛等）を alphaTest 0.5 で抜きます。</span></span>
+                </label>
+                <label class="flex items-start gap-2 cursor-pointer">
                     <input type="checkbox" data-fix="offset" ${bsFix.offset ? 'checked' : ''} class="w-3.5 h-3.5 mt-0.5 shrink-0 accent-indigo-500 cursor-pointer">
                     <span><span class="font-semibold text-white">デカールZファイト防止</span><br><span class="text-slate-500 text-[10px]">顔に密着した透過メッシュ（青ざめ・テレ・目デカール）のちらつき・欠けを抑制します。</span></span>
                 </label>
@@ -644,6 +677,8 @@
                 `side=${m.side}`,
                 `blend=${m.blending}`,
                 `renderOrder=${m.renderOrder}`,
+                `texAlpha=${m.texAlpha}`,
+                `shadeTex=${m.origShadeTex === undefined ? 'n/a' : !!m.origShadeTex}`,
                 `mesh=${m.meshLabel}`
             ].join(' | '));
             return head.concat(rows).join('\n');
@@ -653,8 +688,12 @@
             (bs.mats || []).forEach((m) => {
                 const mat = m.mat;
                 // カットオフは不透明マテリアルにも効く（髪の荷透け対策）。
-                if (m.userOrder === undefined) {
-                    mat.alphaTest = bsFix.cutout > 0 ? bsFix.cutout : m.alphaTest;
+                if (!m.userCut) {
+                    let at = m.alphaTest;
+                    // ベーステクスチャに透明部分がある不透明マテリアルはカットアウト化
+                    if (bsFix.autocut && m.texAlpha) at = 0.5;
+                    if (bsFix.cutout > 0) at = bsFix.cutout;
+                    mat.alphaTest = at;
                 }
                 if (m.wasTransparent) {
                     if (bsFix.zwrite) {
@@ -668,6 +707,10 @@
                     mat.polygonOffset = !!bsFix.offset;
                     mat.polygonOffsetFactor = bsFix.offset ? -1 : 0;
                     mat.polygonOffsetUnits = bsFix.offset ? -(bsPriority(m.name) / 10) : 0;
+                }
+                // MToon のシェード色補正：_ShadeTexture 未設定だと陰が白くなる
+                if (m.origShadeTex !== undefined && !m.origShadeTex && mat.map) {
+                    mat.shadeMultiplyTexture = bsFix.shade ? mat.map : null;
                 }
                 mat.needsUpdate = true;
 
@@ -729,7 +772,7 @@
                 } else if (t.dataset.mcut !== undefined && t.type === 'range') {
                     const m = bs.mats[parseInt(t.dataset.mcut, 10)];
                     const pct = parseInt(t.value, 10);
-                    if (m) { m.mat.alphaTest = pct / 100; m.mat.needsUpdate = true; }
+                    if (m) { m.userCut = true; m.mat.alphaTest = pct / 100; m.mat.needsUpdate = true; }
                     bsSetOut(`mc|${t.dataset.mcut}`, pct);
                 } else if (t.dataset.cut) {
                     const pct = parseInt(t.value, 10);
