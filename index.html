@@ -96,7 +96,7 @@
     </div>
 
     <div id="p2" class="page-transition hidden-page" style="background-color: #111827;">
-        <div id="d2" class="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] z-0 pointer-events-none flex flex-wrap justify-center items-center opacity-[0.07] rotate-[-30deg] select-none text-white text-4xl md:text-5xl font-bold tracking-widest overflow-hidden"></div>
+        <div id="d2" class="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] z-20 pointer-events-none flex flex-wrap justify-center items-center opacity-[0.07] rotate-[-30deg] select-none text-white text-4xl md:text-5xl font-bold tracking-widest overflow-hidden"></div>
         <div id="c1" class="absolute inset-0 z-10"></div>
         <div class="absolute inset-0 z-30 pointer-events-none flex flex-col justify-between p-4 md:p-6">
             <div class="flex justify-between items-start">
@@ -106,9 +106,14 @@
                         <h4 id="t1" class="font-bold text-sm md:text-base">Model</h4>
                     </div>
                 </div>
-                <button onclick="x6()" class="bg-slate-900/90 hover:bg-slate-800 backdrop-blur border border-slate-800 text-slate-300 hover:text-white px-3 py-2 md:px-4 md:py-2.5 rounded-xl flex items-center gap-2 text-xs md:text-sm pointer-events-auto transition-all shadow-lg">
-                    <i data-lucide="x" class="w-4 h-4"></i><span>閉じる</span>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button id="bsOpen" onclick="bsToggle()" style="display:none" class="bg-slate-900/90 hover:bg-slate-800 backdrop-blur border border-slate-800 text-slate-300 hover:text-white px-3 py-2 md:px-4 md:py-2.5 rounded-xl items-center gap-2 text-xs md:text-sm pointer-events-auto transition-all shadow-lg">
+                        <i data-lucide="smile" class="w-4 h-4"></i><span>表情 / BlendShape</span>
+                    </button>
+                    <button onclick="x6()" class="bg-slate-900/90 hover:bg-slate-800 backdrop-blur border border-slate-800 text-slate-300 hover:text-white px-3 py-2 md:px-4 md:py-2.5 rounded-xl flex items-center gap-2 text-xs md:text-sm pointer-events-auto transition-all shadow-lg">
+                        <i data-lucide="x" class="w-4 h-4"></i><span>閉じる</span>
+                    </button>
+                </div>
             </div>
             <div class="flex flex-row gap-2 md:gap-3 justify-between items-end">
                 <div id="h1" class="bg-slate-900/90 backdrop-blur border border-slate-800 p-2.5 md:p-4 rounded-xl text-[10px] md:text-xs text-slate-300 space-y-1.5 pointer-events-auto shadow-lg max-w-[200px] md:max-w-sm"></div>
@@ -116,6 +121,23 @@
                     <i data-lucide="refresh-cw" class="w-3.5 h-3.5 md:w-4 md:h-4"></i><span>カメラリセット</span>
                 </button>
             </div>
+        </div>
+        <div id="bsPanel" style="display:none" class="absolute z-40 right-4 md:right-6 top-[4.5rem] md:top-24 w-[250px] md:w-[300px] max-h-[calc(100%-10rem)] flex-col bg-slate-900/95 backdrop-blur border border-slate-800 rounded-xl shadow-2xl text-white pointer-events-auto overflow-hidden">
+            <div class="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-slate-800 shrink-0">
+                <div class="flex items-center gap-2 min-w-0">
+                    <i data-lucide="smile" class="w-4 h-4 text-indigo-400 shrink-0"></i>
+                    <span class="text-xs font-bold truncate">表情 / BlendShape</span>
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                    <button onclick="bsReset()" title="すべてリセット" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i></button>
+                    <button onclick="bsToggle()" title="パネルを閉じる" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"><i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></button>
+                </div>
+            </div>
+            <div id="bsTabs" class="grid grid-cols-4 gap-1 p-2 border-b border-slate-800 text-[10px] md:text-[11px] shrink-0"></div>
+            <div class="px-2 pt-2 shrink-0">
+                <input id="bsSearch" type="text" placeholder="名前で検索" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500">
+            </div>
+            <div id="bsBody" class="flex-1 overflow-y-auto mt-2"></div>
         </div>
         <div id="l1" class="absolute inset-0 bg-slate-950/90 backdrop-blur z-50 flex flex-col items-center justify-center text-white transition-opacity duration-300 opacity-0 pointer-events-none">
             <div class="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-6"></div>
@@ -128,14 +150,14 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        import { VRMLoaderPlugin } from '@pixiv/three-vrm';
+        import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
         lucide.createIcons();
         const x1 = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
         if (localStorage.getItem('f1') === '1') {
             localStorage.removeItem('f1');
-            setTimeout(() => alert("【システム通知】\n前回の読み込み中にスマートフォンのメモリ（グラフィックス処理能力）の限界に達し、OSによりブラウザが強制再起動されました。\n\nこのモデルはスマートフォンでは表示できません。PC環境での確認をお願いいたします。"), 600);
+            setTimeout(() => alert("【システム通知】\n前回の読み込み中にスマートフォンのメモリ（グラフ���ックス処理能力）の限界に達し、OSによりブラウザが強制再起動されました。\n\nこのモデルはスマートフォンでは表示できません。PC環境での確認をお願いいたします。"), 600);
         }
 
         function x2() {
@@ -266,7 +288,8 @@
             y6.innerHTML = '';
             xw = new THREE.Scene();
 
-            xy = new THREE.WebGLRenderer({ antialias: !x1, alpha: true });
+            xy = new THREE.WebGLRenderer({ antialias: !x1, alpha: false, premultipliedAlpha: false });
+            xw.background = new THREE.Color(0x111827);
             xy.setSize(y6.clientWidth, y6.clientHeight);
             xy.setPixelRatio(x1 ? 1 : Math.min(window.devicePixelRatio, 2));
             xy.outputColorSpace = THREE.SRGBColorSpace;
@@ -306,6 +329,7 @@
                 });
                 y1 = null;
             }
+            bsClear();
         }
 
         window.y9 = function() {
@@ -329,8 +353,14 @@
                 (gltf) => {
                     const z6 = gltf.userData.vrm;
                     y1 = z6;
+                    // three-vrm 推奨の最適化（morph は統合しない：BlendShape 個別操作を毋すため）
+                    try { VRMUtils.removeUnnecessaryVertices(gltf.scene); } catch (err) { console.warn(err); }
+                    try { VRMUtils.combineSkeletons(gltf.scene); } catch (err) { console.warn(err); }
+
                     xw.add(z6.scene);
-                    z6.scene.rotation.y = Math.PI;
+                    // VRM0 は 180度回転、VRM1 はそのまま（手動回転だと VRM1 で背向きになる）
+                    VRMUtils.rotateVRM0(z6);
+                    z6.scene.traverse((o) => { o.frustumCulled = false; });
                     z6.scene.updateMatrixWorld(true);
 
                     y4.set(0, 1.4, 0);
@@ -342,6 +372,7 @@
                         y4.set(0, z9.max.y * 0.9, 0);
                     }
                     window.y9();
+                    bsSetup(z6);
 
                     URL.revokeObjectURL(xv);
 
@@ -362,6 +393,285 @@
             );
         }
 
+        /* ===== BlendShape / 表情 / パーツ表示 コントロール ===== */
+        const bs = {
+            open: false,
+            tab: 'exp',
+            expr: [],
+            morph: [],
+            parts: [],
+            overrides: new Map()
+        };
+        const bsTabDefs = [
+            { id: 'exp', label: '表情' },
+            { id: 'bs', label: 'BlendShape' },
+            { id: 'parts', label: 'パーツ' },
+            { id: 'render', label: '描画' }
+        ];
+        const bsFix = { zwrite: true, cutout: 0 };
+
+        function bsEsc(s) {
+            return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function bsCollect(vrm) {
+            bs.expr = []; bs.morph = []; bs.parts = []; bs.overrides.clear();
+            const em = vrm.expressionManager;
+            if (em) {
+                const names = em.expressionMap
+                    ? Object.keys(em.expressionMap)
+                    : (em.expressions || []).map((e) => e.expressionName).filter(Boolean);
+                bs.expr = [...new Set(names)].sort();
+            }
+            bs.mats = [];
+            const seen = new Set();
+            let i = 0;
+            vrm.scene.traverse((o) => {
+                if (!o.isMesh && !o.isSkinnedMesh) return;
+                const label = o.name || `Mesh ${i}`;
+                const mats = (Array.isArray(o.material) ? o.material : [o.material]).filter(Boolean);
+                bs.parts.push({
+                    mesh: o,
+                    label,
+                    op: 1,
+                    orig: mats.map((m) => ({ mat: m, transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite }))
+                });
+                mats.forEach((m) => {
+                    if (seen.has(m.uuid)) return;
+                    seen.add(m.uuid);
+                    bs.mats.push({
+                        mat: m,
+                        name: m.name || label,
+                        wasTransparent: !!m.transparent,
+                        depthWrite: m.depthWrite,
+                        alphaTest: m.alphaTest || 0,
+                        zw: ('transparentWithZWrite' in m) ? m.transparentWithZWrite : undefined
+                    });
+                });
+                if (o.morphTargetDictionary) {
+                    Object.keys(o.morphTargetDictionary).forEach((name) => {
+                        const idx = o.morphTargetDictionary[name];
+                        bs.morph.push({ mesh: o, meshLabel: label, name, index: idx, key: `${o.uuid}:${idx}` });
+                    });
+                }
+                i++;
+            });
+        }
+
+        function bsExprVal(n) {
+            try { return y1?.expressionManager?.getValue(n) ?? 0; } catch (e) { return 0; }
+        }
+        function bsMorphVal(m) {
+            const o = bs.overrides.get(m.key);
+            if (o) return o.value;
+            return m.mesh.morphTargetInfluences?.[m.index] ?? 0;
+        }
+
+        function bsSliderRow(id, label, sub, val) {
+            const pct = Math.round(val * 100);
+            return `<div class="px-3 py-2 border-b border-slate-800/60">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-[11px] font-medium text-slate-100 truncate" title="${bsEsc(label)}">${bsEsc(label)}</span>
+                    <span class="text-[10px] text-slate-400 tabular-nums w-8 text-right shrink-0" data-out="${bsEsc(id)}">${pct}%</span>
+                </div>
+                ${sub ? `<div class="text-[9px] text-slate-500 truncate mt-0.5">${bsEsc(sub)}</div>` : ''}
+                <input type="range" min="0" max="100" step="1" value="${pct}" data-slider="${bsEsc(id)}" class="w-full mt-1.5 h-4 accent-indigo-500 cursor-pointer">
+            </div>`;
+        }
+
+        function bsPartRow(i, p) {
+            const pct = Math.round((p.op ?? 1) * 100);
+            return `<div class="px-3 py-2 border-b border-slate-800/60">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" data-vis="${i}" ${p.mesh.visible ? 'checked' : ''} class="w-3.5 h-3.5 shrink-0 accent-indigo-500 cursor-pointer">
+                    <span class="text-[11px] font-medium text-slate-100 truncate" title="${bsEsc(p.label)}">${bsEsc(p.label)}</span>
+                    <span class="text-[10px] text-slate-400 tabular-nums w-8 text-right shrink-0 ml-auto" data-out="p|${i}">${pct}%</span>
+                </label>
+                <input type="range" min="0" max="100" step="1" value="${pct}" data-op="${i}" class="w-full mt-1.5 h-4 accent-indigo-500 cursor-pointer">
+            </div>`;
+        }
+
+        function bsEmpty(msg) {
+            return `<div class="px-3 py-6 text-center text-[11px] text-slate-500">${bsEsc(msg)}</div>`;
+        }
+
+        function bsRenderTabs() {
+            const el = document.getElementById('bsTabs');
+            const counts = { exp: bs.expr.length, bs: bs.morph.length, parts: bs.parts.length, render: (bs.mats || []).length };
+            el.innerHTML = bsTabDefs.map((t) => {
+                const on = bs.tab === t.id;
+                return `<button data-tab="${t.id}" class="px-1.5 py-1.5 rounded-lg font-semibold transition-colors truncate ${on ? 'bg-indigo-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-white'}">${t.label}<span class="opacity-60"> ${counts[t.id]}</span></button>`;
+            }).join('');
+        }
+
+        function bsRender() {
+            const body = document.getElementById('bsBody');
+            if (!body) return;
+            bsRenderTabs();
+            const q = (document.getElementById('bsSearch').value || '').trim().toLowerCase();
+            if (bs.tab === 'exp') {
+                const list = bs.expr.filter((n) => !q || n.toLowerCase().includes(q));
+                body.innerHTML = list.length
+                    ? list.map((n) => bsSliderRow(`e|${n}`, n, '', bsExprVal(n))).join('')
+                    : bsEmpty(bs.expr.length ? '一致する表情がありません' : 'このモデルには表情(Expression)が定義されていません');
+            } else if (bs.tab === 'bs') {
+                const list = bs.morph.filter((m) => !q || m.name.toLowerCase().includes(q) || m.meshLabel.toLowerCase().includes(q));
+                const shown = list.slice(0, 300);
+                body.innerHTML = shown.length
+                    ? shown.map((m) => bsSliderRow(`m|${m.key}`, m.name, m.meshLabel, bsMorphVal(m))).join('')
+                        + (list.length > shown.length ? bsEmpty(`ほか ${list.length - shown.length} 件は検索で絞り込んでください`) : '')
+                    : bsEmpty(bs.morph.length ? '一致するBlendShapeがありません' : 'BlendShapeが見つかりません');
+            } else if (bs.tab === 'parts') {
+                const list = bs.parts.map((p, i) => ({ p, i })).filter(({ p }) => !q || p.label.toLowerCase().includes(q));
+                body.innerHTML = list.length
+                    ? list.map(({ p, i }) => bsPartRow(i, p)).join('')
+                    : bsEmpty('一致するパーツがありません');
+            } else {
+                body.innerHTML = bsRenderTabBody();
+            }
+        }
+
+        function bsRenderTabBody() {
+            const tCount = (bs.mats || []).filter((m) => m.wasTransparent).length;
+            const cut = Math.round(bsFix.cutout * 100);
+            return `<div class="px-3 py-3 space-y-3 text-[11px] text-slate-300">
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" data-fix="zwrite" ${bsFix.zwrite ? 'checked' : ''} class="w-3.5 h-3.5 mt-0.5 shrink-0 accent-indigo-500 cursor-pointer">
+                    <span><span class="font-semibold text-white">透過ZWrite補正</span><br><span class="text-slate-500 text-[10px]">半透明マテリアルに深度書き込みを強制。前髪およびまつげ・瞳の前後関係を Unity の見え方に近づけます。</span></span>
+                </label>
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="font-semibold text-white">Alphaカットオフ</span>
+                        <span class="text-slate-400 tabular-nums" data-out="cut">${cut}%</span>
+                    </div>
+                    <input type="range" min="0" max="100" step="1" value="${cut}" data-cut="1" class="w-full mt-1.5 h-4 accent-indigo-500 cursor-pointer">
+                    <p class="text-slate-500 text-[10px] mt-1">0%＝ブレンドのまま。上げると薄いピクセルを切り抜き（Cutout化）し、髪の荷透けを押さえます。目元が透ける場合は 40〜60% が目安です。</p>
+                </div>
+                <div class="text-slate-500 text-[10px] border-t border-slate-800 pt-2">半透明マテリアル: ${tCount} / 全 ${(bs.mats || []).length}</div>
+            </div>`;
+        }
+
+        function bsApplyRenderFix() {
+            (bs.mats || []).forEach((m) => {
+                if (!m.wasTransparent) return;
+                const mat = m.mat;
+                if (bsFix.zwrite) {
+                    if (m.zw !== undefined) mat.transparentWithZWrite = true;
+                    mat.depthWrite = true;
+                } else {
+                    if (m.zw !== undefined) mat.transparentWithZWrite = m.zw;
+                    mat.depthWrite = m.depthWrite;
+                }
+                mat.alphaTest = bsFix.cutout > 0 ? bsFix.cutout : m.alphaTest;
+                mat.needsUpdate = true;
+            });
+        }
+
+        function bsSetOut(id, pct) {
+            const out = document.querySelector(`[data-out="${CSS.escape(id)}"]`);
+            if (out) out.textContent = `${pct}%`;
+        }
+
+        function bsApplyOpacity(p, v) {
+            p.op = v;
+            p.orig.forEach((o) => {
+                if (v >= 1) {
+                    o.mat.transparent = o.transparent;
+                    o.mat.opacity = o.opacity;
+                    o.mat.depthWrite = o.depthWrite;
+                } else {
+                    o.mat.transparent = true;
+                    o.mat.opacity = o.opacity * v;
+                    o.mat.depthWrite = false;
+                }
+                o.mat.needsUpdate = true;
+            });
+        }
+
+        function bsBind() {
+            const body = document.getElementById('bsBody');
+            document.getElementById('bsTabs').addEventListener('click', (e) => {
+                const b = e.target.closest('[data-tab]');
+                if (!b) return;
+                bs.tab = b.dataset.tab;
+                bsRender();
+            });
+            document.getElementById('bsSearch').addEventListener('input', bsRender);
+            body.addEventListener('input', (e) => {
+                const t = e.target;
+                if (t.dataset.slider) {
+                    const pct = parseInt(t.value, 10);
+                    const v = pct / 100;
+                    bsSetOut(t.dataset.slider, pct);
+                    const [kind, ref] = [t.dataset.slider.slice(0, 1), t.dataset.slider.slice(2)];
+                    if (kind === 'e') {
+                        y1?.expressionManager?.setValue(ref, v);
+                    } else {
+                        const m = bs.morph.find((x) => x.key === ref);
+                        if (m) {
+                            if (v === 0) bs.overrides.delete(m.key); else bs.overrides.set(m.key, { mesh: m.mesh, index: m.index, value: v });
+                            if (m.mesh.morphTargetInfluences) m.mesh.morphTargetInfluences[m.index] = v;
+                        }
+                    }
+                } else if (t.dataset.cut) {
+                    const pct = parseInt(t.value, 10);
+                    bsFix.cutout = pct / 100;
+                    bsSetOut('cut', pct);
+                    bsApplyRenderFix();
+                } else if (t.dataset.op) {
+                    const p = bs.parts[parseInt(t.dataset.op, 10)];
+                    const pct = parseInt(t.value, 10);
+                    if (p) { bsApplyOpacity(p, pct / 100); bsSetOut(`p|${t.dataset.op}`, pct); }
+                }
+            });
+            body.addEventListener('change', (e) => {
+                const t = e.target;
+                if (t.dataset.fix === 'zwrite') {
+                    bsFix.zwrite = t.checked;
+                    bsApplyRenderFix();
+                    return;
+                }
+                if (t.dataset.vis !== undefined && t.type === 'checkbox') {
+                    const p = bs.parts[parseInt(t.dataset.vis, 10)];
+                    if (p) p.mesh.visible = t.checked;
+                }
+            });
+        }
+        bsBind();
+
+        window.bsToggle = function() {
+            bs.open = !bs.open;
+            document.getElementById('bsPanel').style.display = bs.open ? 'flex' : 'none';
+            if (bs.open) bsRender();
+        };
+
+        window.bsReset = function() {
+            bs.expr.forEach((n) => { try { y1?.expressionManager?.setValue(n, 0); } catch (e) {} });
+            bs.overrides.clear();
+            bs.morph.forEach((m) => { if (m.mesh.morphTargetInfluences) m.mesh.morphTargetInfluences[m.index] = 0; });
+            bs.parts.forEach((p) => { p.mesh.visible = true; bsApplyOpacity(p, 1); });
+            bsRender();
+        };
+
+        function bsSetup(vrm) {
+            bsCollect(vrm);
+            document.getElementById('bsSearch').value = '';
+            bsApplyRenderFix();
+            bs.tab = bs.expr.length ? 'exp' : (bs.morph.length ? 'bs' : 'parts');
+            document.getElementById('bsOpen').style.display = 'flex';
+            bs.open = false;
+            window.bsToggle();
+        }
+
+        function bsClear() {
+            bs.expr = []; bs.morph = []; bs.parts = []; bs.mats = []; bs.overrides.clear();
+            bs.open = false;
+            const panel = document.getElementById('bsPanel');
+            if (panel) panel.style.display = 'none';
+            const btn = document.getElementById('bsOpen');
+            if (btn) btn.style.display = 'none';
+        }
+
         const w1 = new THREE.Clock();
         function w2() { if (!y3) { y3 = true; w4(); } }
         function w3() { y3 = false; if (y2) cancelAnimationFrame(y2); }
@@ -369,6 +679,11 @@
             if (!y3) return;
             y2 = requestAnimationFrame(w4);
             if (y1) y1.update(w1.getDelta());
+            if (y1 && bs.overrides.size) {
+                bs.overrides.forEach((o) => {
+                    if (o.mesh.morphTargetInfluences) o.mesh.morphTargetInfluences[o.index] = o.value;
+                });
+            }
             if (xz) xz.update();
             if (xy && xw && xx) {
                 xy.render(xw, xx);
