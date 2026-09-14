@@ -96,7 +96,7 @@
     </div>
 
     <div id="p2" class="page-transition hidden-page" style="background-color: #111827;">
-        <div id="d2" class="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] z-0 pointer-events-none flex flex-wrap justify-center items-center opacity-[0.07] rotate-[-30deg] select-none text-white text-4xl md:text-5xl font-bold tracking-widest overflow-hidden"></div>
+        <div id="d2" class="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] z-20 pointer-events-none flex flex-wrap justify-center items-center opacity-[0.07] rotate-[-30deg] select-none text-white text-4xl md:text-5xl font-bold tracking-widest overflow-hidden"></div>
         <div id="c1" class="absolute inset-0 z-10"></div>
         <div class="absolute inset-0 z-30 pointer-events-none flex flex-col justify-between p-4 md:p-6">
             <div class="flex justify-between items-start">
@@ -150,7 +150,7 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        import { VRMLoaderPlugin } from '@pixiv/three-vrm';
+        import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
         lucide.createIcons();
         const x1 = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -288,7 +288,8 @@
             y6.innerHTML = '';
             xw = new THREE.Scene();
 
-            xy = new THREE.WebGLRenderer({ antialias: !x1, alpha: true });
+            xy = new THREE.WebGLRenderer({ antialias: !x1, alpha: false, premultipliedAlpha: false });
+            xw.background = new THREE.Color(0x111827);
             xy.setSize(y6.clientWidth, y6.clientHeight);
             xy.setPixelRatio(x1 ? 1 : Math.min(window.devicePixelRatio, 2));
             xy.outputColorSpace = THREE.SRGBColorSpace;
@@ -352,8 +353,14 @@
                 (gltf) => {
                     const z6 = gltf.userData.vrm;
                     y1 = z6;
+                    // three-vrm 推奨の最適化（morph は統合しない：BlendShape 個別操作を毋すため）
+                    try { VRMUtils.removeUnnecessaryVertices(gltf.scene); } catch (err) { console.warn(err); }
+                    try { VRMUtils.combineSkeletons(gltf.scene); } catch (err) { console.warn(err); }
+
                     xw.add(z6.scene);
-                    z6.scene.rotation.y = Math.PI;
+                    // VRM0 は 180度回転、VRM1 はそのまま（手動回転だと VRM1 で背向きになる）
+                    VRMUtils.rotateVRM0(z6);
+                    z6.scene.traverse((o) => { o.frustumCulled = false; });
                     z6.scene.updateMatrixWorld(true);
 
                     y4.set(0, 1.4, 0);
